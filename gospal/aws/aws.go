@@ -16,7 +16,6 @@ package awsprovider
 
 import (
 	"context"
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -28,6 +27,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -47,6 +47,13 @@ type provider struct {
 	config *gospal.ProviderConfig
 }
 
+func (p *provider) getTargetKey(filePath string) string {
+	if p.config.GlobalPrefix != "" {
+		return path.Join(p.config.GlobalPrefix, filePath)
+	}
+	return filePath
+}
+
 func (p *provider) ListKeys(pathName ...string) (fileList []string, err error) {
 	if len(pathName) > 1 {
 		return nil, errors.ErrorTooMuchListKeysArgs()
@@ -55,13 +62,14 @@ func (p *provider) ListKeys(pathName ...string) (fileList []string, err error) {
 	if len(pathName) != 0 {
 		extraPath = pathName[0]
 	}
-	targetKey := fmt.Sprintf("%v", path.Join(p.config.GlobalPrefix, extraPath))
-	fmt.Println("targetkey is ", targetKey)
+	targetKey := p.getTargetKey(extraPath)
 	params := s3.ListObjectsInput{
-		Bucket:    aws.String(p.bucketName),
-		Prefix:    aws.String(targetKey),
-		Delimiter: aws.String(p.config.Delimiter),
-		MaxKeys:   aws.Int64(p.config.MaxKeys),
+		Bucket:  aws.String(p.bucketName),
+		Prefix:  aws.String(targetKey),
+		MaxKeys: aws.Int64(p.config.MaxKeys),
+	}
+	if p.config.Delimiter != "" {
+		params.Delimiter = aws.String(p.config.Delimiter)
 	}
 
 	page := request.Pagination{
@@ -85,7 +93,7 @@ func (p *provider) ListKeys(pathName ...string) (fileList []string, err error) {
 
 func (p *provider) GetStream(filePath string) (io.Reader, context.CancelFunc, error) {
 	ctx, cancel := context.WithTimeout(p.context, time.Second*time.Duration(p.config.TimeOut))
-	targetKey := path.Join(p.config.GlobalPrefix, filePath)
+	targetKey := p.getTargetKey(filePath)
 	result, err := p.s3Service.GetObjectWithContext(ctx,
 		&s3.GetObjectInput{
 			Bucket: &p.bucketName,
@@ -99,8 +107,10 @@ func (p *provider) GetStream(filePath string) (io.Reader, context.CancelFunc, er
 }
 
 func (p *provider) PutStream(filePath string, reader io.Reader) (int64, error) {
-	targetKey := path.Join(p.config.GlobalPrefix, filePath)
-	_, err := p.uploader.Upload(&s3manager.UploadInput{
+	ctx, cancel := context.WithCancel(p.context)
+	defer cancel()
+	targetKey := p.getTargetKey(filePath)
+	_, err := p.uploader.UploadWithContext(ctx, &s3manager.UploadInput{
 		Bucket: &p.bucketName,
 		Key:    &targetKey,
 		Body:   reader,
@@ -116,7 +126,7 @@ func (p *provider) GetKind() string {
 }
 
 func (p *provider) DeleteKey(filePath string) error {
-	targetKey := path.Join(p.config.GlobalPrefix, filePath)
+	targetKey := p.getTargetKey(filePath)
 	if _, err := p.s3Service.DeleteObject(&s3.DeleteObjectInput{
 		Bucket: &p.bucketName,
 		Key:    &targetKey,
@@ -150,9 +160,10 @@ func New(ctx context.Context, bucket string, config *gospal.ProviderConfig) (gos
 	provider.context = ctx
 	provider.kind = "aws"
 
-	cfg := &aws.Config{
-		// TODO: make this a confugration setting settable a test time !
-		S3ForcePathStyle: aws.Bool(true),
+	cfg := &aws.Config{}
+
+	if reflect.TypeOf(config.SpecConfig) == reflect.TypeOf(&aws.Config{}) {
+		cfg = config.SpecConfig.(*aws.Config)
 	}
 
 	if endpoint := os.Getenv("AWS_ENDPOINT"); endpoint != "" {

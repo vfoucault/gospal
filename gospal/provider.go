@@ -70,6 +70,11 @@ type ProviderConfig struct {
 
 	// AWS Only: max number of key to fetch at once
 	MaxKeys int64
+
+	// Provider Specific Configuration.
+	// type of interface to mach any, but will be reflected to specific provider configuration.
+	// eg.: &aws.Config
+	SpecConfig interface{}
 }
 
 //NewProviderConfig constructor with default value setter
