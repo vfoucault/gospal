@@ -17,7 +17,6 @@ package gcpprovider
 import (
 	"cloud.google.com/go/storage"
 	"context"
-	"fmt"
 	"github.com/contentsquare/gospal/gospal"
 	"github.com/contentsquare/gospal/gospal/errors"
 	"google.golang.org/api/iterator"
@@ -36,6 +35,13 @@ type provider struct {
 	config *gospal.ProviderConfig
 }
 
+func (p *provider) getTargetKey(filePath string) string {
+	if p.config.GlobalPrefix != "" {
+		return path.Join(p.config.GlobalPrefix, filePath)
+	}
+	return filePath
+}
+
 func (p *provider) ListKeys(pathName ...string) (fileList []string, err error) {
 	if len(pathName) > 1 {
 		return nil, errors.ErrorTooMuchListKeysArgs()
@@ -44,7 +50,7 @@ func (p *provider) ListKeys(pathName ...string) (fileList []string, err error) {
 	if len(pathName) != 0 {
 		extraPath = pathName[0]
 	}
-	targetKey := fmt.Sprintf("%v/", path.Join(p.config.GlobalPrefix, extraPath))
+	targetKey := p.getTargetKey(extraPath)
 	it := p.client.Bucket(p.bucketName).Objects(p.context, &storage.Query{
 		Prefix:    targetKey,
 		Delimiter: p.config.Delimiter,
@@ -69,15 +75,15 @@ func (p *provider) GetStream(filePath string) (io.Reader, context.CancelFunc, er
 	var reader *storage.Reader
 	var err error
 
-	if reader, err = p.client.Bucket(p.bucketName).Object(path.Join(p.config.GlobalPrefix, filePath)).NewReader(ctx); err != nil {
+	if reader, err = p.client.Bucket(p.bucketName).Object(p.getTargetKey(filePath)).NewReader(ctx); err != nil {
 		defer cancel()
-		return nil, nil, errors.ErrorGetStreamReader(path.Join(p.config.GlobalPrefix, filePath), err.Error())
+		return nil, nil, errors.ErrorGetStreamReader(p.getTargetKey(filePath), err.Error())
 	}
 	return reader, cancel, err
 }
 
 func (p *provider) PutStream(filePath string, stream io.Reader) (written int64, err error) {
-	targetKey := path.Join(p.config.GlobalPrefix, filePath)
+	targetKey := p.getTargetKey(filePath)
 	ctx, cancel := context.WithTimeout(p.context, time.Second*time.Duration(p.config.TimeOut))
 	defer cancel()
 	wc := p.client.Bucket(p.bucketName).Object(targetKey).NewWriter(ctx)
@@ -93,8 +99,8 @@ func (p *provider) GetKind() string {
 }
 
 func (p *provider) DeleteKey(filePath string) error {
-	if err := p.client.Bucket(p.bucketName).Object(path.Join(p.config.GlobalPrefix, filePath)).Delete(p.context); err != nil {
-		return errors.ErrorDeleteKey(path.Join(p.config.GlobalPrefix, filePath), err.Error())
+	if err := p.client.Bucket(p.bucketName).Object(p.getTargetKey(filePath)).Delete(p.context); err != nil {
+		return errors.ErrorDeleteKey(p.getTargetKey(filePath), err.Error())
 	}
 	return nil
 }
@@ -106,6 +112,7 @@ func (p *provider) GetNoSuchKeyErrorString() string {
 //New gcp provider constructor
 func New(ctx context.Context, bucket string, config *gospal.ProviderConfig) (gospal.Gospal, error) {
 	provider := provider{bucketName: bucket}
+	provider.kind = "gcp"
 	provider.noSuchKeyErrorString = storage.ErrObjectNotExist.Error()
 	provider.config = config
 	provider.context = ctx

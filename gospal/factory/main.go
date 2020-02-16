@@ -20,6 +20,7 @@ import (
 	"github.com/contentsquare/gospal/gospal/aws"
 	"github.com/contentsquare/gospal/gospal/errors"
 	"github.com/contentsquare/gospal/gospal/gcp"
+	localprovider "github.com/contentsquare/gospal/gospal/local"
 )
 
 //NewProviderFactory constructor for a provider
