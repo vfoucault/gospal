@@ -36,6 +36,11 @@ func NewProviderFactory(ctx context.Context, kind string, bucket string, config 
 			return nil, errors.ErrorInitProvider(kind, err.Error())
 		}
 		return provider, err
+	case string(gospal.ProviderLocal):
+		if provider, err = localprovider.New(ctx, bucket, config); err != nil {
+			return nil, errors.ErrorInitProvider(kind, err.Error())
+		}
+		return provider, err
 	}
 	return nil, errors.ErrorUnknownProvider(kind)
 }

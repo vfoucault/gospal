@@ -32,6 +32,8 @@ var (
 	ProviderAWS ProviderLabel = "aws"
 	//ProviderGCP ProviderLabel for GCP
 	ProviderGCP ProviderLabel = "gcp"
+	//ProviderLocal ProviderLabel for Local
+	ProviderLocal ProviderLabel = "local"
 )
 
 //Gospal interface that represents a Storage Gospal
