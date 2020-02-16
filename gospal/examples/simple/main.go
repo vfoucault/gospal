@@ -34,7 +34,7 @@ var (
 
 func main() {
 
-	flag.StringVar(&providerKind, "provider", "", "the provider kind. either aws or gcp")
+	flag.StringVar(&providerKind, "provider", "", "the provider kind. (aws,gcp or local)")
 	flag.StringVar(&bucket, "bucket", "", "the bucket name")
 	flag.StringVar(&prefix, "prefix", "", "the prefix value. could be empty")
 
