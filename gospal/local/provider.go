@@ -115,7 +115,7 @@ func New(ctx context.Context, bucket string, config *gospal.ProviderConfig) (gos
 	provider := provider{directory: bucket}
 	// check to directory to exists
 	if _, err := os.Stat(bucket); os.IsNotExist(err) {
-		if err2 := os.MkdirAll(bucket, 0600); err2 != nil {
+		if err2 := os.MkdirAll(bucket, 0700); err2 != nil {
 			return nil, fmt.Errorf("unable to create local directory %v. err=%v", bucket, err.Error())
 		}
 	}
